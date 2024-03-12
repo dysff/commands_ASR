@@ -1,34 +1,41 @@
 import tensorflow as tf
-from tensorflow import keras
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from IPython import display
+import os
 
 config = tf.compat.v1.ConfigProto()
 config.gpu_options.per_process_gpu_memory_fraction = 1
 session = tf.compat.v1.InteractiveSession(config=config)
 
-train_ds, val_ds = tf.keras.utils.audio_dataset_from_directory(
-  directory='mini_speech_commands',
-  batch_size=64,
-  validation_split=0.2,
-  seed=0,
-  output_sequence_length=16000,
-  subset='both'
-)
+DATA_PATH = 'mini_speech_commands'
+classes = os.listdir(DATA_PATH)
+audio_files = []
+labels = []
 
-labels = np.array(train_ds.class_names)
-# print(train_ds.element_spec)
+for class_name in classes:
+  
+  for filename in os.listdir(DATA_PATH + f'/{class_name}'):
+    audio_files.append(DATA_PATH + f'/{class_name}/{filename}')
+    labels.append(class_name)
+
+data = tf.data.Dataset.from_tensor_slices((audio_files, labels))
+data = data.shuffle(len(data))
+
+def loan_and_decode_audio(audio, label):
+  audio_binary = tf.io.read_file(audio)
+  waveform, _ = tf.audio.decode_wav(audio_binary, desired_samples=16000)
+  
+  return waveform, label
+
+data = data.map(loan_and_decode_audio)#?
+
+train_ds, val_ds = data.take(6400), data.skip(6400)
+train_ds, val_ds = train_ds.batch(64), val_ds.batch(64)
 
 def squeeze(audio, labels):
   audio = tf.squeeze(audio, axis=-1)
   
   return audio, labels
 
-#The map function is used to apply the squeeze function to each element in the dataset. 
-#The squeeze function is expected to take two arguments, an audio tensor and labels, and it returns the squeezed audio tensor and the unchanged labels.
-train_ds = train_ds.map(squeeze, tf.data.AUTOTUNE)#what is AUTOTUNE?
+train_ds = train_ds.map(squeeze, tf.data.AUTOTUNE)
 val_ds = val_ds.map(squeeze, tf.data.AUTOTUNE)
 
 test_ds = val_ds.shard(num_shards=2, index=0)
@@ -40,8 +47,7 @@ for example_audio, example_labels in train_ds.take(1):
 
 def get_spectrogram(waveform):
   # Convert the waveform to a spectrogram via a STFT.
-  spectrogram = tf.signal.stft(
-      waveform, frame_length=255, frame_step=128)
+  spectrogram = tf.signal.stft(waveform, frame_length=255, frame_step=128)
   # Obtain the magnitude of the STFT.
   spectrogram = tf.abs(spectrogram)
   # Add a `channels` dimension, so that the spectrogram can be used
@@ -49,14 +55,3 @@ def get_spectrogram(waveform):
   # shape (`batch_size`, `height`, `width`, `channels`).
   spectrogram = spectrogram[..., tf.newaxis]
   return spectrogram
-
-for i in range(3):
-  label = labels[example_labels[i]]#?
-  waveform = example_audio[i]#?
-  spectrogram = get_spectrogram(waveform)#?
-
-  print('Label:', label)
-  print('Waveform shape:', waveform.shape)
-  print('Spectrogram shape:', spectrogram.shape)
-  print('Audio playback')
-  display.display(display.Audio(waveform, rate=16000))
