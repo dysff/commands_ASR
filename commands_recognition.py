@@ -1,11 +1,11 @@
 import tensorflow as tf
+from tensorflow import keras
 from keras.models import Sequential
 from keras.layers import Dense, Conv2D, Flatten, Dropout
-from tensorflow import keras
-import matplotlib.pyplot as plt
+from keras.utils import to_categorical
 from sklearn.preprocessing import LabelEncoder
 import os
-from keras.utils import to_categorical
+import matplotlib.pyplot as plt
 
 config = tf.compat.v1.ConfigProto()
 config.gpu_options.per_process_gpu_memory_fraction = 1
@@ -58,6 +58,7 @@ def preprocess(file_path, label):
   spectrogram = tf.signal.stft(wav, frame_length=255, frame_step=128)#what is frame_length and frame_step
   spectrogram = tf.abs(spectrogram)
   spectrogram = tf.expand_dims(spectrogram, axis=2)#creates channel dimension
+  print(type(spectrogram))
   
   return spectrogram, label
 
@@ -80,63 +81,66 @@ train, test = data.take(100), data.skip(100).take(25)
 
 #test one batch
 samples, labels = train.as_numpy_iterator().next()
-print(samples.shape)
-print(labels)
+print(type(samples))
+# print(labels)
 
 #-----------------------------BUILDING THE MODEL----------------------------
 
-model = Sequential()
+def training():
+  model = Sequential()
 
-model.add(Conv2D(filters=16, kernel_size=(3, 3), activation='relu', input_shape=(124, 129, 1)))
-model.add(Conv2D(filters=16, kernel_size=(3, 3), activation='relu', input_shape=(124, 129, 1)))
+  model.add(Conv2D(filters=16, kernel_size=(3, 3), activation='relu', input_shape=(124, 129, 1)))
+  model.add(Conv2D(filters=16, kernel_size=(3, 3), activation='relu', input_shape=(124, 129, 1)))
 
-model.add(Conv2D(filters=32, kernel_size=(3, 3), activation='relu', input_shape=(124, 129, 1)))
-model.add(Conv2D(filters=32, kernel_size=(3, 3), activation='relu', input_shape=(124, 129, 1)))
+  model.add(Conv2D(filters=32, kernel_size=(3, 3), activation='relu', input_shape=(124, 129, 1)))
+  model.add(Conv2D(filters=32, kernel_size=(3, 3), activation='relu', input_shape=(124, 129, 1)))
 
-model.add(Flatten())
+  model.add(Flatten())
 
-model.add(Dense(units=128, activation='relu'))
-model.add(Dropout(0.5))
-model.add(Dense(units=64, activation='relu'))
-model.add(Dropout(0.5))
-model.add(Dense(units=32, activation='relu'))
-model.add(Dropout(0.5))
+  model.add(Dense(units=128, activation='relu'))
+  model.add(Dropout(0.5))
+  model.add(Dense(units=64, activation='relu'))
+  model.add(Dropout(0.5))
+  model.add(Dense(units=32, activation='relu'))
+  model.add(Dropout(0.5))
 
-model.add(Dense(len(classes), activation='softmax'))
+  model.add(Dense(len(classes), activation='softmax'))
 
-model.compile(optimizer=keras.optimizers.Adam(), 
-              loss='categorical_crossentropy', 
-              metrics=[keras.metrics.Recall(), keras.metrics.Precision(), 'accuracy'])
+  model.compile(optimizer=keras.optimizers.Adam(), 
+                loss='categorical_crossentropy', 
+                metrics=[keras.metrics.Recall(), keras.metrics.Precision(), 'accuracy'])
 
-stop_early = keras.callbacks.EarlyStopping(patience=15, monitor='val_accuracy')
-history = model.fit(train, epochs=10 ** 10, validation_data=test, callbacks=[stop_early])
+  stop_early = keras.callbacks.EarlyStopping(patience=15, monitor='val_accuracy')
+  history = model.fit(train, epochs=10 ** 10, validation_data=test, callbacks=[stop_early])
 
-tf.keras.models.save_model(model, 'speech_recognition_model_v1.h5')
+  # tf.keras.models.save_model(model, 'speech_recognition_model_v1.h5')
 
-#learning curve visualization
-learning_curve_data = history.history
-precision = learning_curve_data['val_precision']
-recall = learning_curve_data['val_recall']
-accuracy = learning_curve_data['val_accuracy']
+  #learning curve visualization
+  learning_curve_data = history.history
+  precision = learning_curve_data['val_precision']
+  recall = learning_curve_data['val_recall']
+  accuracy = learning_curve_data['val_accuracy']
 
-epochs = range(1, len(precision) + 1)
+  epochs = range(1, len(precision) + 1)
 
-plt.figure(figsize=(10, 5))
+  plt.figure(figsize=(10, 5))
 
-plt.subplot(1, 2, 1)
-plt.plot(epochs, precision, 'b', label='Validation Precision')
-plt.plot(epochs, recall, 'r', label='Validation Recall')
-plt.xlabel('Epochs')
-plt.ylabel('Metrics')
-plt.title('Validation Precision and Recall')
-plt.legend()
+  plt.subplot(1, 2, 1)
+  plt.plot(epochs, precision, 'b', label='Validation Precision')
+  plt.plot(epochs, recall, 'r', label='Validation Recall')
+  plt.xlabel('Epochs')
+  plt.ylabel('Metrics')
+  plt.title('Validation Precision and Recall')
+  plt.legend()
 
-plt.subplot(1, 2, 2)
-plt.plot(epochs, accuracy, 'g', label='Validation Accuracy')
-plt.xlabel('Epochs')
-plt.ylabel('Accuracy')
-plt.title('Validation Accuracy')
-plt.legend()
+  plt.subplot(1, 2, 2)
+  plt.plot(epochs, accuracy, 'g', label='Validation Accuracy')
+  plt.xlabel('Epochs')
+  plt.ylabel('Accuracy')
+  plt.title('Validation Accuracy')
+  plt.legend()
 
-plt.tight_layout()
-plt.show()
+  plt.tight_layout()
+  plt.show()
+
+# training()
