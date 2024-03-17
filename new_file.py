@@ -106,18 +106,37 @@ model.add(Dense(len(classes), activation='softmax'))
 
 model.compile(optimizer=keras.optimizers.Adam(), 
               loss='categorical_crossentropy', 
-              metrics=[keras.metrics.Recall(), keras.metrics.Precision()])
+              metrics=[keras.metrics.Recall(), keras.metrics.Precision(), 'accuracy'])
 
-history = model.fit(train, epochs=15, validation_data=test)
+stop_early = keras.callbacks.EarlyStopping(patience=15, monitor='val_accuracy')
+history = model.fit(train, epochs=10 ** 10, validation_data=test, callbacks=[stop_early])
+
+tf.keras.models.save_model(model, 'speech_recognition_model_v1.h5')
 
 #learning curve visualization
 learning_curve_data = history.history
-precision = learning_curve_data['precision']
-recall = learning_curve_data['recall']
+precision = learning_curve_data['val_precision']
+recall = learning_curve_data['val_recall']
+accuracy = learning_curve_data['val_accuracy']
 
-plt.plot(recall, precision)
+epochs = range(1, len(precision) + 1)
 
-plt.xlabel('Recall')
-plt.ylabel('Precision')
+plt.figure(figsize=(10, 5))
 
+plt.subplot(1, 2, 1)
+plt.plot(epochs, precision, 'b', label='Validation Precision')
+plt.plot(epochs, recall, 'r', label='Validation Recall')
+plt.xlabel('Epochs')
+plt.ylabel('Metrics')
+plt.title('Validation Precision and Recall')
+plt.legend()
+
+plt.subplot(1, 2, 2)
+plt.plot(epochs, accuracy, 'g', label='Validation Accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.title('Validation Accuracy')
+plt.legend()
+
+plt.tight_layout()
 plt.show()
