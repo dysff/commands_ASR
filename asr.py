@@ -22,8 +22,8 @@ def capture_audio():
     FORMAT = pyaudio.paInt16
     CHANNELS = 1
     RATE = 16000
-    SILENCE_THRESHOLD = 1000
-    SILENCE_CHUNKS_THRESHOLD = 5  # Adjust this as needed
+    RECORD_THRESHOLD = 300
+    SILENCE_CHUNKS_THRESHOLD = 2  # Adjust this as needed
 
     audio = pyaudio.PyAudio()
 
@@ -37,22 +37,33 @@ def capture_audio():
     print("Listening...")
 
     frames = []
+    flag = 0
     silence_counter = 0
 
     while True:
-        data = stream.read(CHUNK)
+      data = stream.read(CHUNK)
+      audio_data = np.frombuffer(data, dtype=np.int16)# Convert audio data to numpy array
+      energy = np.sum(audio_data ** 2) / len(audio_data)# Calculate energy of the audio frame
+      print('ENERGY: ', energy)
+      
+      if flag:
         frames.append(data)
-        audio_data = np.frombuffer(data, dtype=np.int16)# Convert audio data to numpy array
-        energy = np.sum(audio_data ** 2) / len(audio_data)# Calculate energy of the audio frame
-
-        if energy < SILENCE_THRESHOLD:# If energy is below threshold, increment silence counter
-            silence_counter += 1
-            
+      
+      elif energy > RECORD_THRESHOLD:
+        flag = 1
+        
+      if flag == 1:
+        
+        if energy < RECORD_THRESHOLD:
+          silence_counter += 1
+          
         else:
-            silence_counter = 0
-
-        if silence_counter > SILENCE_CHUNKS_THRESHOLD:# If silence lasts for more than a threshold, stop capturing
-            break
+          silence_counter = 0
+      
+      # print('SILENSE_COUNTER: ', silence_counter, 'FLAG: ', flag)
+      if silence_counter > SILENCE_CHUNKS_THRESHOLD:
+        flag = 0
+        break
 
     print("Recording stopped.")
 
@@ -110,6 +121,12 @@ while True:
   capture_audio()
   spectrogram_tensor = preprocess('output_file.wav')
   prediction = model.predict(spectrogram_tensor)
-  predicted_class_index = tf.argmax(prediction, axis=1)
-  predicted_class_decoded = label_encoder.inverse_transform(predicted_class_index)
-  print('Recognized speech: ', predicted_class_decoded)
+
+  max_probability = np.max(prediction)
+  if max_probability < 0.85:
+      print('Speech is not recognized...')
+      continue
+
+  predicted_class_index = np.argmax(prediction)
+  predicted_class_decoded = label_encoder.inverse_transform([predicted_class_index])
+  print('Recognized speech: ', predicted_class_decoded, 'with probability:', max_probability)
