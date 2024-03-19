@@ -22,7 +22,7 @@ def capture_audio():
     FORMAT = pyaudio.paInt16
     CHANNELS = 1
     RATE = 16000
-    RECORD_THRESHOLD = 300
+    RECORD_THRESHOLD = 1500
     SILENCE_CHUNKS_THRESHOLD = 2  # Adjust this as needed
 
     audio = pyaudio.PyAudio()
@@ -34,38 +34,41 @@ def capture_audio():
                         frames_per_buffer=CHUNK,
                         input_device_index=1)
 
-    print("Listening...")
+    print('Listening...')
 
     frames = []
-    flag = 0
-    silence_counter = 0
-
+    flag, frames_recorded, silence_counter, total_frames = 0, 0, 0, 0
+    
     while True:
       data = stream.read(CHUNK)
+      frames.append(data)
       audio_data = np.frombuffer(data, dtype=np.int16)# Convert audio data to numpy array
-      energy = np.sum(audio_data ** 2) / len(audio_data)# Calculate energy of the audio frame
-      print('ENERGY: ', energy)
+      silence_level = np.sum(audio_data ** 2) / len(audio_data)# Calculate silence_level of the audio frame
+      # print(f'SILENCE_LEVEL: {silence_level}')
       
-      if flag:
-        frames.append(data)
-      
-      elif energy > RECORD_THRESHOLD:
+      if silence_level > RECORD_THRESHOLD:
         flag = 1
+        frames_recorded += 1
         
-      if flag == 1:
+      if flag:
         
-        if energy < RECORD_THRESHOLD:
+        if silence_level < RECORD_THRESHOLD:
           silence_counter += 1
           
         else:
           silence_counter = 0
-      
-      # print('SILENSE_COUNTER: ', silence_counter, 'FLAG: ', flag)
+          
       if silence_counter > SILENCE_CHUNKS_THRESHOLD:
         flag = 0
+        total_frames = frames_recorded
+        
+        print('-----------------RECORDED AUDIO INFO-----------------')
+        print(f'TOTAL_FRAMES: {total_frames}')
+        print(f'AMOUNT_OF_FRAMES: {len(frames)}')
+        print('-----------------------------------------------------')
+        
+        frames_recorded = 0
         break
-
-    print("Recording stopped.")
 
     stream.stop_stream()
     stream.close()
@@ -75,8 +78,7 @@ def capture_audio():
       wf.setnchannels(CHANNELS)
       wf.setsampwidth(audio.get_sample_size(FORMAT))#what is get_sample_size
       wf.setframerate(RATE)
-      
-      wf.writeframes(b''.join(frames))
+      wf.writeframes(b''.join(frames[-(total_frames + 12):]))
       wf.close()
 
 capture_audio()
@@ -124,9 +126,9 @@ while True:
 
   max_probability = np.max(prediction)
   if max_probability < 0.85:
-      print('Speech is not recognized...')
+      print('SPEECH IS NOT RECOGNIZED...')
       continue
 
   predicted_class_index = np.argmax(prediction)
   predicted_class_decoded = label_encoder.inverse_transform([predicted_class_index])
-  print('Recognized speech: ', predicted_class_decoded, 'with probability:', max_probability)
+  print('RECOGNIZED SPEECH: ', predicted_class_decoded, 'PROBABILITY: ', max_probability)
