@@ -22,7 +22,7 @@ def capture_audio():
     FORMAT = pyaudio.paInt16
     CHANNELS = 1
     RATE = 16000
-    RECORD_THRESHOLD = 1500
+    RECORD_THRESHOLD = 1000
     SILENCE_CHUNKS_THRESHOLD = 2  # Adjust this as needed
 
     audio = pyaudio.PyAudio()
@@ -81,13 +81,13 @@ def capture_audio():
       wf.writeframes(b''.join(frames[-(total_frames + 12):]))
       wf.close()
 
-capture_audio()
-
-#encoding
-DATA_PATH = r'E:\VScodeProjects\commands_recognition\mini_speech_commands'
-classes = os.listdir(DATA_PATH)
-label_encoder = LabelEncoder()
-label_encoder = label_encoder.fit(classes)
+def encode():
+  DATA_PATH = r'mini_speech_commands'
+  classes = os.listdir(DATA_PATH)
+  label_encoder = LabelEncoder()
+  label_encoder = label_encoder.fit(classes)
+  
+  return label_encoder
 
 def load_wav_16k_mono(filename):
   file_contents = tf.io.read_file(filename)
@@ -119,16 +119,18 @@ def preprocess(filename):
     
   return spectrogram
 
-while True:
-  capture_audio()
-  spectrogram_tensor = preprocess('output_file.wav')
-  prediction = model.predict(spectrogram_tensor)
+def speech_recognition():
+  
+  while True:
+    capture_audio()
+    spectrogram_tensor = preprocess('output_file.wav')
+    prediction = model.predict(spectrogram_tensor)
 
-  max_probability = np.max(prediction)
-  if max_probability < 0.85:
-      print('SPEECH IS NOT RECOGNIZED...')
-      continue
+    max_probability = np.max(prediction)
+    if max_probability < 0.85:
+        print('SPEECH IS NOT RECOGNIZED...')
+        continue
 
-  predicted_class_index = np.argmax(prediction)
-  predicted_class_decoded = label_encoder.inverse_transform([predicted_class_index])
-  print('RECOGNIZED SPEECH: ', predicted_class_decoded, 'PROBABILITY: ', max_probability)
+    predicted_class_index = np.argmax(prediction)
+    predicted_class_decoded = encode().inverse_transform([predicted_class_index])
+    print('RECOGNIZED SPEECH: ', predicted_class_decoded, 'PROBABILITY: ', max_probability)
